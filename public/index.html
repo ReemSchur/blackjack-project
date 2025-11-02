@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reem's Blackjack</title>
+    </head>
+<body>
+
+    <h1>Reem's Blackjack Game</h1>
+
+    <div id="game-controls">
+        <button id="btn-new-game">New Game</button>
+        <button id="btn-hit" disabled>Hit</button>
+        <button id="btn-stand" disabled>Stand</button>
+    </div>
+
+    <h2 id="message-area">Welcome! Press 'New Game' to start.</h2>
+
+    <div id="game-area">
+        <div id="dealer-area">
+            <h3>Dealer's Hand (Score: <span id="dealer-score">?</span>)</h3>
+            <div id="dealer-cards">
+                </div>
+        </div>
+        
+        <div id="player-area">
+            <h3>Player's Hand (Score: <span id="player-score">?</span>)</h3>
+            <div id="player-cards">
+                </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
