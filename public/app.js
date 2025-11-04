@@ -16,11 +16,17 @@ const playerScoreEl = document.getElementById('player-score');
 const dealerCardsEl = document.getElementById('dealer-cards');
 const playerCardsEl = document.getElementById('player-cards');
 
+const walletArea = document.getElementById('wallet-area');
+const betAmountInput = document.getElementById('bet-amount');
+const betControls = document.getElementById('bet-controls');
+const actionControls = document.getElementById('action-controls');
+const btnRestart = document.getElementById('btn-restart');
 
 // 3. Add Event Listeners to the buttons
 btnNewGame.addEventListener('click', newGame);
 btnHit.addEventListener('click', hit);
 btnStand.addEventListener('click', stand);
+btnRestart.addEventListener('click', restartWallet);
 
 
 /**
@@ -29,20 +35,42 @@ btnStand.addEventListener('click', stand);
 
 async function newGame() {
     console.log("Starting new game...");
-    
+
+    // --- NEW --- Get bet amount from input
+    const betAmount = betAmountInput.value;
+
     // Call the '/game/new' endpoint on our server
     const response = await fetch(`${API_URL}/game/new`, {
-        method: 'POST'
+        method: 'POST',
+        // --- NEW --- Send the bet amount in the body
+        headers: {
+            'Content-Type': 'application/json' // Tell the server we're sending JSON
+        },
+        body: JSON.stringify({ betAmount: betAmount }) // Convert our data to a JSON string
     });
+
     const gameState = await response.json();
 
+    // --- NEW --- Check for errors from the server (e.g. not enough money)
+    if (gameState.error) {
+        messageArea.textContent = gameState.error;
+        return; // Stop here if there was an error
+    }
+
     // Update the screen with the new game state
-    updateUI(gameState);
-    
-    // Enable the Hit and Stand buttons
-    btnHit.disabled = false;
-    btnStand.disabled = false;
+updateUI(gameState); // updateUI will handle buttons *if* game is over
+
+// --- NEW LOGIC ---
+// Only hide bet controls IF the game is *not* over
+if (!gameState.isGameOver) {
+    // Normal game start, show action buttons
+    betControls.style.display = 'none';
+    actionControls.style.display = 'block';
 }
+}
+// If the game *is* over (from Blackjack), updateUI already handled
+// showing the bet controls, so we do nothing here.
+
 
 async function hit() {
     console.log("Player HITS...");
@@ -70,6 +98,30 @@ async function stand() {
     updateUI(gameState);
 }
 
+/**
+ * Resets the wallet via the server.
+ */
+async function restartWallet() {
+    console.log("Resetting wallet...");
+    
+    // Call the '/game/restart' endpoint
+    const response = await fetch(`${API_URL}/game/restart`, {
+        method: 'POST'
+    });
+    const gameState = await response.json();
+
+    // Update the UI with the reset state
+    updateUI(gameState);
+
+    // Manually reset the UI to the starting position
+    betControls.style.display = 'block';
+    actionControls.style.display = 'none';
+    dealerScoreEl.textContent = '?';
+    playerScoreEl.textContent = '?';
+    playerCardsEl.innerHTML = '';
+    dealerCardsEl.innerHTML = '';
+    messageArea.textContent = gameState.message; // Show reset message
+}
 
 /**
  * 5. Helper Functions - These update the webpage
@@ -79,15 +131,23 @@ function updateUI(gameState) {
     // Update messages and scores
     messageArea.textContent = gameState.message;
     playerScoreEl.textContent = gameState.playerScore;
-    
-    // If the game is over, show the dealer's final score
+
+    // --- NEW --- Update wallet display
+    // Use ?? (Nullish Coalescing) in case wallet isn't sent every time
+    // (Though our server *does* send it, this is good practice)
+    if (gameState.playerWallet !== undefined) {
+        walletArea.textContent = `Wallet: $${gameState.playerWallet}`;
+    }
+
+    // If the game is over...
     if (gameState.isGameOver) {
         dealerScoreEl.textContent = gameState.dealerScore;
-        // Disable buttons
-        btnHit.disabled = true;
-        btnStand.disabled = true;
-    } else {
-        // If game is not over, hide dealer's score
+
+        // --- NEW --- Show betting, hide Hit/Stand
+        betControls.style.display = 'block';
+        actionControls.style.display = 'none';
+
+    } else { // If game is NOT over...
         dealerScoreEl.textContent = '?';
     }
 
@@ -95,7 +155,6 @@ function updateUI(gameState) {
     renderHand(gameState.playerHand, playerCardsEl);
     renderHand(gameState.dealerHand, dealerCardsEl, !gameState.isGameOver);
 }
-
 /**
  * Renders the cards for a specific hand
  * @param {Array} hand - Array of card objects

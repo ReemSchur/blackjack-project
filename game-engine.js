@@ -83,6 +83,8 @@ class Game {
         this.dealerScore = 0;
         this.isGameOver = false;
         this.message = ""; // To store messages like "Player busts!"
+        this.playerHasBlackjack = false;
+        this.dealerHasBlackjack = false;
     }
 
     /**
@@ -113,20 +115,50 @@ class Game {
     /**
      * Deals the initial two cards to player and dealer.
      */
-    startGame() {
-        // Deal two cards to the player
-        this.playerHand.push(this.deck.deal());
-        this.playerHand.push(this.deck.deal());
-        this.playerScore = this.calculateScore(this.playerHand);
+    /**
+ * Deals the initial two cards and CHECKS FOR BLACKJACK.
+ */
+startGame() {
+    // Deal two cards to the player
+    this.playerHand.push(this.deck.deal());
+    this.playerHand.push(this.deck.deal());
+    this.playerScore = this.calculateScore(this.playerHand);
 
-        // Deal two cards to the dealer
-        this.dealerHand.push(this.deck.deal());
-        this.dealerHand.push(this.deck.deal());
-        this.dealerScore = this.calculateScore(this.dealerHand);
+    // Deal two cards to the dealer
+    this.dealerHand.push(this.deck.deal());
+    this.dealerHand.push(this.deck.deal());
+    this.dealerScore = this.calculateScore(this.dealerHand);
 
-        this.message = "Welcome to Reem's Blackjack!";
+    // --- NEW --- Check for immediate Blackjack
+    // Check if player has 21 on 2 cards
+    if (this.playerScore === 21 && this.playerHand.length === 2) {
+        this.playerHasBlackjack = true;
+    }
+    // Check if dealer has 21 on 2 cards
+    if (this.dealerScore === 21 && this.dealerHand.length === 2) {
+        this.dealerHasBlackjack = true;
     }
 
+    // --- NEW --- Determine instant winner
+    if (this.playerHasBlackjack) {
+        if (this.dealerHasBlackjack) {
+            // Both have Blackjack -> Push
+            this.isGameOver = true;
+            this.message = "Push! Both player and dealer have Blackjack.";
+        } else {
+            // Only player has Blackjack -> Player wins
+            this.isGameOver = true;
+            this.message = "Blackjack! Player wins!";
+        }
+    } else if (this.dealerHasBlackjack) {
+        // Only dealer has Blackjack -> Dealer wins
+        this.isGameOver = true;
+        this.message = "Dealer has Blackjack. Dealer wins.";
+    } else {
+        // No Blackjack, game continues
+        this.message = "Welcome to Reem's Blackjack!";
+    }
+}
     /**
      * Player requests another card.
      */
