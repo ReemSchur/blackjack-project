@@ -1,7 +1,7 @@
 // --- Client-Side JavaScript (app.js) ---
 
 // 1. Define the server API endpoint
-const API_URL = 'http://localhost:3000';
+const API_URL = ''; // Use relative path
 
 // 2. --- UPDATED --- Session ID
 // We now try to load it from the browser's memory

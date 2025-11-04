@@ -1,4 +1,19 @@
 {
+  "name": "blackjack-project",
+  "version": "1.0.0",
+  "description": "A Full-Stack Blackjack game built with Node.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "blackjack",
+    "node",
+    "express"
+  ],
+  "author": "Reem",
+  "license": "ISC",
   "dependencies": {
     "better-sqlite3": "^12.4.1",
     "cors": "^2.8.5",

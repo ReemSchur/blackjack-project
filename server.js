@@ -9,7 +9,7 @@ const { Game } = require('./game-engine.js');
 
 // 3. Create our server application
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // 4. --- NEW: Setup Database ---
 // This creates a file 'blackjack.db' in your project folder
