@@ -3,9 +3,9 @@
 // 1. Define the server API endpoint
 const API_URL = 'http://localhost:3000';
 
-// 2. --- NEW --- Session ID
-// This will store the unique ID for this player's session
-let sessionId = null;
+// 2. --- UPDATED --- Session ID
+// We now try to load it from the browser's memory
+let sessionId = localStorage.getItem('blackjackSessionId') || null;
 
 // 3. Get references to all the HTML elements
 const btnNewGame = document.getElementById('btn-new-game');
@@ -35,22 +35,44 @@ btnRestart.addEventListener('click', restartWallet);
 
 
 /**
- * 5. --- NEW --- Initialize Session
- * This function is called immediately when the page loads.
- * It gets a unique session ID from the server.
+ * 5. --- UPDATED --- Initialize Session
+ * This function now checks for a saved session in localStorage
  */
 async function initializeSession() {
     try {
-        const response = await fetch(`${API_URL}/session/new`, {
-            method: 'POST'
-        });
+        let url = `${API_URL}/session/new`; // Default
+        let options = { method: 'POST' };
+
+        // If we have a saved ID, try to resume that session instead
+        if (sessionId) {
+            console.log(`Found saved sessionId: ${sessionId}. Resuming...`);
+            url = `${API_URL}/session/resume`;
+            options.headers = { 'Content-Type': 'application/json' };
+            options.body = JSON.stringify({ sessionId: sessionId });
+        } else {
+            console.log("No saved session. Requesting new one...");
+        }
+
+        const response = await fetch(url, options);
+        if (!response.ok) {
+            // If session resume fails (e.g., server restarted and lost session ID)
+            // Clear the bad ID and request a new one
+            console.warn("Resuming session failed, getting new one.");
+            localStorage.removeItem('blackjackSessionId');
+            sessionId = null;
+            await initializeSession(); // Retry getting a new session
+            return;
+        }
+
         const data = await response.json();
         
-        sessionId = data.sessionId; // Save our unique ID
+        sessionId = data.sessionId; // Save/update our unique ID
         
-        // Update UI with initial data from server
+        // --- NEW --- Save the (potentially new) ID to browser memory
+        localStorage.setItem('blackjackSessionId', sessionId);
+
         messageArea.textContent = data.message;
-        walletArea.textContent = `Wallet: $${data.playerWallet}`;
+        walletArea.textContent = `Wallet: $${parseFloat(data.playerWallet).toFixed(2)}`;
         
         // Now that we are ready, show the betting controls
         betControls.style.display = 'block';
@@ -75,7 +97,6 @@ async function newGame() {
         headers: {
             'Content-Type': 'application/json'
         },
-        // Send BOTH the session ID and the bet
         body: JSON.stringify({ 
             sessionId: sessionId, 
             betAmount: betAmount 
@@ -91,7 +112,6 @@ async function newGame() {
 
     updateUI(gameState);
 
-    // Only show action buttons if the game isn't over (e.g., from Blackjack)
     if (!gameState.isGameOver) {
         betControls.style.display = 'none';
         actionControls.style.display = 'block';
@@ -106,7 +126,6 @@ async function hit() {
         headers: {
             'Content-Type': 'application/json'
         },
-        // Send the session ID so the server knows *who* is hitting
         body: JSON.stringify({ sessionId: sessionId })
     });
     const gameState = await response.json();
@@ -122,7 +141,6 @@ async function stand() {
         headers: {
             'Content-Type': 'application/json'
         },
-        // Send the session ID so the server knows *who* is standing
         body: JSON.stringify({ sessionId: sessionId })
     });
     const gameState = await response.json();
@@ -130,9 +148,6 @@ async function stand() {
     updateUI(gameState);
 }
 
-/**
- * Resets the wallet via the server.
- */
 async function restartWallet() {
     console.log("Resetting wallet...");
     
@@ -141,15 +156,13 @@ async function restartWallet() {
         headers: {
             'Content-Type': 'application/json'
         },
-        // Send the session ID to reset the correct wallet
         body: JSON.stringify({ sessionId: sessionId })
     });
     const gameState = await response.json();
 
-    // Update the UI with the reset state
     updateUI(gameState);
 
-    // Manually reset the UI to the starting position
+    // Manually reset the UI
     betControls.style.display = 'block';
     actionControls.style.display = 'none';
     dealerScoreEl.textContent = '?';
@@ -165,76 +178,68 @@ async function restartWallet() {
  */
 
 function updateUI(gameState) {
-    messageArea.textContent = gameState.message;
-    
-    // Check for null score, default to '?'
-    playerScoreEl.textContent = gameState.playerScore !== null ? gameState.playerScore : '?';
+    // Check if gameState exists
+    if (!gameState) {
+        console.error("Invalid gameState received");
+        return;
+    }
+
+    messageArea.textContent = gameState.message || "An error occurred."; // Fallback message
+    playerScoreEl.textContent = gameState.playerScore !== null && gameState.playerScore !== undefined ? gameState.playerScore : '?';
     
     if (gameState.playerWallet !== undefined) {
-        // Format wallet to 2 decimal places if it's a fraction (from 3:2 payout)
         walletArea.textContent = `Wallet: $${parseFloat(gameState.playerWallet).toFixed(2)}`;
     }
 
     if (gameState.isGameOver) {
-        dealerScoreEl.textContent = gameState.dealerScore !== null ? gameState.dealerScore : '?';
-        // Show betting, hide Hit/Stand
+        dealerScoreEl.textContent = gameState.dealerScore !== null && gameState.dealerScore !== undefined ? gameState.dealerScore : '?';
         betControls.style.display = 'block';
         actionControls.style.display = 'none';
     } else {
         dealerScoreEl.textContent = '?';
     }
 
-    // Render the hands
     renderHand(gameState.playerHand, playerCardsEl);
     renderHand(gameState.dealerHand, dealerCardsEl, !gameState.isGameOver);
 }
 
-/**
- * --- THIS FUNCTION IS UPDATED ---
- * Renders the cards for a specific hand using <img> tags
- * @param {Array} hand - Array of card objects
- * @param {HTMLElement} element - The HTML element to put the cards in
- * @param {boolean} hideFirstCard - If true, hides the dealer's first card
- */
 function renderHand(hand, element, hideFirstCard = false) {
-    // Clear previous cards
     element.innerHTML = '';
-    
     if (!hand) return;
 
-    // Base URL for card images
     const cardImageUrl = 'https://deckofcardsapi.com/static/img';
 
     hand.forEach((card, index) => {
-        // Create an <img> element
         const cardImg = document.createElement('img');
-        cardImg.className = 'card'; // For styling
+        cardImg.className = 'card'; 
 
         if (hideFirstCard && index === 0) {
-            // Show a card back
             cardImg.src = `${cardImageUrl}/back.png`;
         } else {
-            // Show the real card using the 'code' (e.g., "AS", "KH", "0H")
-            cardImg.src = `${cardImageUrl}/${card.code}.png`;
+            // Check if card object and card.code exist
+            if (card && card.code) {
+                cardImg.src = `${cardImageUrl}/${card.code}.png`;
+            } else {
+                // Fallback or error logging
+                console.error("Card object is missing 'code' property:", card);
+                cardImg.alt = "Error"; // Show something if image fails
+            }
         }
         
-        // Add a little delay to each card for a "dealing" animation
-        // This makes the animation staggered
         cardImg.style.animationDelay = `${index * 100}ms`;
-
         element.appendChild(cardImg);
     });
 }
 
 
 /**
- * 8. --- NEW --- Start everything!
- * We hide all controls by default to prevent clicks before session is ready
+ * 8. Start everything!
  */
 betControls.style.display = 'none';
 actionControls.style.display = 'none';
 btnRestart.style.display = 'none';
 messageArea.textContent = 'Connecting to server...';
 
-// Call the initialize function when the script loads
+// This one function now handles everything
 initializeSession();
+

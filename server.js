@@ -2,6 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto'); // For generating unique IDs
+const Database = require('better-sqlite3'); // --- NEW: Import the database driver ---
 
 // 2. Import our *own* Game logic
 const { Game } = require('./game-engine.js');
@@ -10,19 +11,32 @@ const { Game } = require('./game-engine.js');
 const app = express();
 const port = 3000;
 
-// 4. Setup Middleware
+// 4. --- NEW: Setup Database ---
+// This creates a file 'blackjack.db' in your project folder
+const db = new Database('blackjack.db'); 
+// Create the wallets table if it doesn't exist.
+db.exec(`
+    CREATE TABLE IF NOT EXISTS wallets (
+        sessionId TEXT PRIMARY KEY NOT NULL,
+        wallet REAL NOT NULL
+    )
+`);
+// --- END NEW DB SETUP ---
+
+// 5. Setup Middleware
 app.use(cors()); // Enable CORS for all requests
 app.use(express.json()); // Automatically parse JSON request bodies
 app.use(express.static('public')); // Serve static files from the 'public' folder
 
-// 5. --- Multi-Game State Management ---
+// 6. --- STATE MANAGEMENT (Now in DB) ---
+// We no longer use global Maps for wallets! They are in the DB.
+// We *still* use a Map for *active games* (which are temporary, in-memory)
 let activeGames = new Map(); // Stores game objects: { sessionId -> game }
-let playerWallets = new Map(); // Stores wallet balances: { sessionId -> balance }
 
 
-// 6. --- NEW HELPER FUNCTION ---
+// 7. --- NEW HELPER FUNCTION --- (This is from our last update)
 /**
- * Calculates the payout, updates the wallet in the Map, and cleans up the game.
+ * Calculates the payout, updates the wallet in the Database, and cleans up the game.
  * @param {string} sessionId - The ID of the current session
  * @param {Game} currentGame - The game object that just finished
  * @param {number} currentWallet - The player's wallet balance *before* payout
@@ -30,7 +44,7 @@ let playerWallets = new Map(); // Stores wallet balances: { sessionId -> balance
  */
 function calculateAndHandlePayout(sessionId, currentGame, currentWallet) {
     const betAmount = currentGame.betAmount;
-    let newWallet = currentWallet; // Start with the wallet balance
+    let newWallet = currentWallet; 
 
     if (currentGame.message.includes('Player wins') && !currentGame.playerHasBlackjack) {
         // Regular 1:1 win
@@ -42,22 +56,18 @@ function calculateAndHandlePayout(sessionId, currentGame, currentWallet) {
         newWallet += betAmount; // Tie: Get bet back
         console.log(`Session ${sessionId} PUSH (tie). Wallet is now $${newWallet}`);
     
-    } else if (currentGame.playerHasBlackjack && currentGame.message.includes('Player wins')) {
-        // Blackjack win (was handled in /game/new, but we check again)
-        // This case should ideally not be hit here, but as a safeguard
-        console.log(`Session ${sessionId} had Blackjack. Payout already handled.`);
-        // We do nothing because the payout was already calculated in /game/new
-        // Note: we need to fetch the *updated* wallet from the map
-        newWallet = playerWallets.get(sessionId);
-
     } else {
-        // Player loses (or busts)
-        // Bet was already subtracted, so wallet balance is correct.
+        // Player loses (or busts), or Dealer Blackjack
         console.log(`Session ${sessionId} LOSES $${betAmount}. Wallet is still $${newWallet}`);
     }
 
-    // Update the wallet in the Map
-    playerWallets.set(sessionId, newWallet);
+    // --- NEW: Update the wallet *in the Database* ---
+    try {
+        const stmt = db.prepare('UPDATE wallets SET wallet = ? WHERE sessionId = ?');
+        stmt.run(newWallet, sessionId);
+    } catch (err) {
+        console.error("DB Update Error:", err.message);
+    }
     
     // Game is over, remove it from active games to save memory
     activeGames.delete(sessionId); 
@@ -69,13 +79,53 @@ function calculateAndHandlePayout(sessionId, currentGame, currentWallet) {
 // --- API Endpoints ---
 
 /**
+ * --- NEW ENDPOINT ---
+ * POST /session/resume
+ * Client is sending an ID it has in storage. Check if it's valid.
+ */
+app.post('/session/resume', (req, res) => {
+    const { sessionId } = req.body;
+    
+    // Check if this session exists in the DB
+    const stmt = db.prepare('SELECT wallet FROM wallets WHERE sessionId = ?');
+    const data = stmt.get(sessionId);
+
+    if (data) {
+        // Session found! Return the saved wallet.
+        console.log(`Resuming session ${sessionId}. Wallet: $${data.wallet}`);
+        res.json({
+            sessionId: sessionId,
+            playerWallet: data.wallet,
+            message: "Welcome back! Place your bet."
+        });
+    } else {
+        // Session not found (e.g., DB was cleared). Create a new one.
+        console.log(`Session ${sessionId} not found. Creating new session.`);
+        createNewSession(res); // Call the 'new session' logic
+    }
+});
+
+/**
  * POST /session/new
- * Creates a new session for a player.
+ * Creates a brand new session for a player.
  */
 app.post('/session/new', (req, res) => {
+    createNewSession(res);
+});
+
+// Helper function to create a new session
+function createNewSession(res) {
     const sessionId = crypto.randomUUID();
     const startingWallet = 100;
-    playerWallets.set(sessionId, startingWallet);
+    
+    // --- NEW: Save the new session to the Database ---
+    try {
+        const stmt = db.prepare('INSERT INTO wallets (sessionId, wallet) VALUES (?, ?)');
+        stmt.run(sessionId, startingWallet);
+    } catch (err) {
+        console.error("DB Insert Error:", err.message);
+        return res.status(500).json({ error: "Could not create session." });
+    }
 
     console.log(`New session created: ${sessionId} with $${startingWallet}`);
 
@@ -84,7 +134,7 @@ app.post('/session/new', (req, res) => {
         playerWallet: startingWallet,
         message: "Welcome! Place your bet to start."
     });
-});
+}
 
 /**
  * POST /game/new
@@ -93,11 +143,15 @@ app.post('/session/new', (req, res) => {
 app.post('/game/new', (req, res) => {
     const { sessionId, betAmount } = req.body;
     
-    if (!sessionId || !playerWallets.has(sessionId)) {
+    // --- NEW: Get wallet from Database ---
+    const stmt_get = db.prepare('SELECT wallet FROM wallets WHERE sessionId = ?');
+    const data = stmt_get.get(sessionId);
+
+    if (!data) {
         return res.status(400).json({ error: 'Invalid session. Please restart.' });
     }
 
-    let currentWallet = playerWallets.get(sessionId);
+    let currentWallet = data.wallet;
     const bet = parseInt(betAmount);
 
     if (!bet || bet <= 0) {
@@ -108,7 +162,10 @@ app.post('/game/new', (req, res) => {
     }
 
     currentWallet -= bet; // Subtract the bet
-    playerWallets.set(sessionId, currentWallet); // Update wallet in Map
+    
+    // --- NEW: Update wallet in DB *before* game starts ---
+    const stmt_update = db.prepare('UPDATE wallets SET wallet = ? WHERE sessionId = ?');
+    stmt_update.run(currentWallet, sessionId); 
 
     const newGame = new Game();
     newGame.startGame();
@@ -122,20 +179,20 @@ app.post('/game/new', (req, res) => {
         console.log("Instant game end (Blackjack logic).");
         if (newGame.message.includes('Player wins')) {
             const winnings = bet * 1.5;
-            finalWallet += (bet + winnings); // Add bet back + 3:2 winnings
-            console.log(`Player BLACKJACK! Wins $${winnings}. Wallet is now $${finalWallet}`);
+            finalWallet += (bet + winnings); 
+            console.log(`Player BLACKJACK! Wins $${winnings}.`);
         } else if (newGame.message.includes('Push')) {
-            finalWallet += bet; // Tie: Get bet back
-            console.log(`Player PUSH (tie). Wallet is now $${finalWallet}`);
+            finalWallet += bet; 
+            console.log(`Player PUSH (tie).`);
         }
-        // If dealer wins, bet is just lost
         
-        playerWallets.set(sessionId, finalWallet); // Save final wallet to Map
-        activeGames.delete(sessionId); // Clean up the game
+        // --- NEW: Update wallet in DB after Blackjack payout ---
+        stmt_update.run(finalWallet, sessionId); 
+        activeGames.delete(sessionId); // Clean up game
     }
     
     console.log(`Session ${sessionId} started game. Wallet is now $${finalWallet}`);
-
+    
     res.json({
         message: newGame.message,
         playerHand: newGame.playerHand,
@@ -154,8 +211,12 @@ app.post('/game/hit', (req, res) => {
     const { sessionId } = req.body;
     
     const currentGame = activeGames.get(sessionId);
-    let currentWallet = playerWallets.get(sessionId);
-    let finalWallet = currentWallet; // Default to current wallet
+    
+    // --- NEW: Get wallet from DB ---
+    const stmt_get = db.prepare('SELECT wallet FROM wallets WHERE sessionId = ?');
+    const data = stmt_get.get(sessionId);
+    let currentWallet = data ? data.wallet : 0; // Get wallet, or default if error
+    let finalWallet = currentWallet; // Default
 
     if (!currentGame) {
         return res.status(400).json({ error: 'No game in progress for this session.' });
@@ -170,14 +231,11 @@ app.post('/game/hit', (req, res) => {
         currentGame.stand(); // Run dealer turn
     }
     
-    // --- THIS IS THE FIX ---
     // *After* hit (and potential auto-stand), check if the game is over
     if (currentGame.isGameOver) {
         console.log("Game ended after hit (Bust or 21-stand). Calculating payout.");
-        // This will handle bust (player > 21) OR auto-stand win/loss
         finalWallet = calculateAndHandlePayout(sessionId, currentGame, currentWallet);
     }
-    // --- END OF FIX ---
 
     res.json({
         message: currentGame.message,
@@ -185,7 +243,7 @@ app.post('/game/hit', (req, res) => {
         playerScore: currentGame.playerScore,
         isGameOver: currentGame.isGameOver,
         dealerHand: currentGame.dealerHand,
-        playerWallet: finalWallet // Send the *final* wallet
+        playerWallet: finalWallet 
     });
 });
 
@@ -197,7 +255,11 @@ app.post('/game/stand', (req, res) => {
     const { sessionId } = req.body;
     
     const currentGame = activeGames.get(sessionId);
-    let currentWallet = playerWallets.get(sessionId);
+    
+    // --- NEW: Get wallet from DB ---
+    const stmt_get = db.prepare('SELECT wallet FROM wallets WHERE sessionId = ?');
+    const data = stmt_get.get(sessionId);
+    let currentWallet = data ? data.wallet : 0;
 
     if (!currentGame) {
         return res.status(400).json({ error: 'No game in progress.' });
@@ -205,11 +267,8 @@ app.post('/game/stand', (req, res) => {
 
     currentGame.stand(); // Dealer plays, winner is determined
 
-    // --- CLEANUP ---
-    // All the old payout logic is now inside this helper function
     const finalWallet = calculateAndHandlePayout(sessionId, currentGame, currentWallet);
     console.log(`Session ${sessionId} STANDS. Final Wallet: $${finalWallet}`);
-    // --- END OF CLEANUP ---
 
     res.json({
         message: currentGame.message,
@@ -224,15 +283,21 @@ app.post('/game/stand', (req, res) => {
 
 /**
  * POST /game/restart
- * Resets a specific session's wallet back to $100.
+ * Resets a specific session's wallet back to $100 in the DB.
  */
 app.post('/game/restart', (req, res) => {
     const { sessionId } = req.body;
     
     const startingWallet = 100;
     
-    playerWallets.set(sessionId, startingWallet);
-    activeGames.delete(sessionId); // Clear any old game
+    // --- NEW: Update the wallet *in the Database* ---
+    try {
+        const stmt = db.prepare('UPDATE wallets SET wallet = ? WHERE sessionId = ?');
+        stmt.run(startingWallet, sessionId);
+        activeGames.delete(sessionId); // Clear any old game
+    } catch (err) {
+        console.error("DB Restart Error:", err.message);
+    }
     
     console.log(`Session ${sessionId} wallet reset to $100`);
 
