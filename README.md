@@ -5,13 +5,13 @@ Click here for the Live Demo
 
 (To add a screenshot: Take a picture of the game, add it to this folder as screenshot.png, and it will appear here.)
 
-1. Overview
+Overview
 
 This project is a complete, full-stack implementation of the game Blackjack (21), built from scratch to demonstrate a deep understanding of modern web architecture. The application simulates a real Blackjack table, including a betting system, 3:2 Blackjack payouts, and separate sessions for each player.
 
 The core challenge was to manage the game state and wallet persistently on the server, completely decoupled from the client-side logic.
 
-2. Features
+Features
 
 Full Game Logic: Implements all standard Blackjack rules (1:1 win, 3:2 Blackjack, Push, Bust, Auto-stand on 21).
 
@@ -23,11 +23,11 @@ RESTful API: A clear API for all game actions (/game/new, /game/hit, /game/stand
 
 Dynamic UI: A clean UI built with vanilla JavaScript, CSS animations, and dynamic card images.
 
-3. System Architecture & Components
+System Architecture & Components
 
 The project is built on a decoupled client-server architecture.
 
-Client (Front-End):
+1. Client (Front-End)
 
 A static "single-page application" (SPA) built with HTML, CSS, and vanilla JavaScript (ES6+).
 
@@ -37,7 +37,7 @@ Uses the Fetch API to send asynchronous requests to the back-end.
 
 Uses localStorage to store the unique sessionId and re-identify the client on page load.
 
-Server (Back-End):
+2. Server (Back-End)
 
 A Node.js / Express.js server that exposes a stateless RESTful API.
 
@@ -47,13 +47,13 @@ Session Management: Manages all active games and wallet balances in-memory (Map)
 
 API Endpoints: Handles all logic for game actions (/game/hit), session creation (/session/new), and payout calculations.
 
-Database (Persistence):
+3. Database (Persistence)
 
 An SQLite database (via better-sqlite3) is used as a persistent storage layer.
 
 The database stores only the sessionId and the corresponding walletAmount, ensuring that a player's bankroll is saved even if the server restarts.
 
-4. File Structure
+File Structure
 
 blackjack-project/
 ├── .gitignore
@@ -68,7 +68,7 @@ blackjack-project/
     └── style.css       # All CSS styling and animations
 
 
-5. Setup and Execution (How To Run Locally)
+Setup and Execution (How To Run Locally)
 
 Instructions for running the project on a local machine.
 
@@ -101,7 +101,7 @@ node server.js
 Open the application:
 Open your browser and navigate to: http://localhost:3000
 
-6. Tech Stack
+Tech Stack
 
 Back-End: Node.js, Express.js
 
@@ -111,4 +111,4 @@ Front-End: JavaScript (ES6+), HTML5, CSS3
 
 Environment: Git, Render (for Deployment)
 
-
+Built as a guided project with Gemini.
