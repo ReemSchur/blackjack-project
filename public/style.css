@@ -20,12 +20,32 @@ h2 {
 /* --- Game Controls (Buttons) --- */
 #game-controls {
     margin-bottom: 25px;
+    /* Center the controls */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+    gap: 10px;
+}
+
+#bet-controls, #action-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#bet-amount {
+    width: 60px;
+    font-size: 1.1em;
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
 }
 
 button {
     font-size: 1.1em;
     padding: 10px 20px;
-    margin: 0 10px;
+    margin: 0 5px; /* Reduced margin */
     border: none;
     border-radius: 5px;
     cursor: pointer;
@@ -58,42 +78,40 @@ button:disabled {
     padding: 20px;
     border-radius: 10px;
     width: 45%;
-    min-height: 200px; /* Make sure they have some height */
+    min-height: 250px; /* Make space for taller cards + score */
 }
 
 /* --- Card Styling --- */
 #player-cards, #dealer-cards {
     display: flex;
-    flex-wrap: wrap; /* Allow cards to wrap to next line if needed */
+    flex-wrap: wrap; /* Allow cards to wrap to next line */
+    justify-content: center; /* Center the cards */
     gap: 10px; /* Space between cards */
-    min-height: 100px; /* Placeholder space for cards */
+    min-height: 150px; /* Make space for taller cards */
+    margin-top: 15px;
 }
 
-/* This is the style for a single card */
+/* This is the style for a single card (now an <img>) */
 .card {
-    width: 80px;
-    height: 120px;
-    padding-top: 10px;
-    border: 1px solid #aaa;
+    width: 100px; /* Set a fixed width for the card image */
+    height: auto; /* Maintain aspect ratio */
     border-radius: 8px;
-    background-color: #ffffff; /* White card */
-    color: #000000; /* Black text */
-    font-size: 2.5em; /* Big rank */
-    font-weight: bold;
     box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.3);
-    text-align: center;
+
+    /* --- NEW: Animation --- */
+    /* Call an animation named 'dealCard', run it once */
+    animation: dealCard 0.5s ease-out forwards;
+    opacity: 0; /* Start invisible, animation will fade it in */
 }
 
-/* Special class for red cards (Hearts/Diamonds) */
-.card.red {
-    color: #FF0000; /* Red text */
-}
-
-/* Special class for the dealer's hidden card */
-.card.card-back {
-    background-color: #3e0a0a; /* Dark red back */
-    color: #b0a000;
-    font-size: 5em;
-    padding-top: 0;
-    line-height: 120px;
+/* --- NEW: Define the animation keyframes --- */
+@keyframes dealCard {
+    from {
+        opacity: 0;
+        transform: translateY(20px); /* Start 20px down */
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0); /* End at normal position */
+    }
 }

@@ -3,6 +3,8 @@ class Card {
     constructor(suit, rank) {
         this.suit = suit; // e.g. 'Spades', 'Hearts', 'Diamonds', 'Clubs'
         this.rank = rank; // e.g. 'A', '2', '3', ..., '10', 'J', 'Q', 'K'
+        // Create the image code for this card (e.g., "AS", "KH", "0D" for 10)
+        this.code = this.getCardCode();
     }
 
     /**
@@ -31,7 +33,25 @@ class Card {
         };
         return `${this.rank} of ${this.suit} ${suitSymbols[this.suit]}`;
     }
+    /**
+     * Generates the card code used for the image API.
+     * e.g., "A", "Spades" -> "AS"
+     * e.g., "10", "Hearts" -> "0H"
+     */
+    getCardCode() {
+        // Map ranks
+        let rankCode = this.rank;
+        if (this.rank === '10') rankCode = '0';
+        if (this.rank === 'Ace') rankCode = 'A'; // Just in case, though we use 'A'
+        
+        // Map suits
+        let suitCode = this.suit[0]; // 'Spades' -> 'S', 'Hearts' -> 'H', etc.
+        
+        return `${rankCode}${suitCode}`;
+    }
 }
+
+
 
 // Represents a 52-card deck
 class Deck {

@@ -3,12 +3,22 @@
 // 1. Define the server API endpoint
 const API_URL = 'http://localhost:3000';
 
-// 2. Get references to all the HTML elements we need
+// 2. --- NEW --- Session ID
+// This will store the unique ID for this player's session
+let sessionId = null;
+
+// 3. Get references to all the HTML elements
 const btnNewGame = document.getElementById('btn-new-game');
 const btnHit = document.getElementById('btn-hit');
 const btnStand = document.getElementById('btn-stand');
+const btnRestart = document.getElementById('btn-restart');
 
 const messageArea = document.getElementById('message-area');
+const walletArea = document.getElementById('wallet-area');
+const betAmountInput = document.getElementById('bet-amount');
+
+const betControls = document.getElementById('bet-controls');
+const actionControls = document.getElementById('action-controls');
 
 const dealerScoreEl = document.getElementById('dealer-score');
 const playerScoreEl = document.getElementById('player-score');
@@ -16,13 +26,8 @@ const playerScoreEl = document.getElementById('player-score');
 const dealerCardsEl = document.getElementById('dealer-cards');
 const playerCardsEl = document.getElementById('player-cards');
 
-const walletArea = document.getElementById('wallet-area');
-const betAmountInput = document.getElementById('bet-amount');
-const betControls = document.getElementById('bet-controls');
-const actionControls = document.getElementById('action-controls');
-const btnRestart = document.getElementById('btn-restart');
 
-// 3. Add Event Listeners to the buttons
+// 4. Add Event Listeners to the buttons
 btnNewGame.addEventListener('click', newGame);
 btnHit.addEventListener('click', hit);
 btnStand.addEventListener('click', stand);
@@ -30,71 +35,98 @@ btnRestart.addEventListener('click', restartWallet);
 
 
 /**
- * 4. Game Functions - These talk to the server
+ * 5. --- NEW --- Initialize Session
+ * This function is called immediately when the page loads.
+ * It gets a unique session ID from the server.
+ */
+async function initializeSession() {
+    try {
+        const response = await fetch(`${API_URL}/session/new`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        sessionId = data.sessionId; // Save our unique ID
+        
+        // Update UI with initial data from server
+        messageArea.textContent = data.message;
+        walletArea.textContent = `Wallet: $${data.playerWallet}`;
+        
+        // Now that we are ready, show the betting controls
+        betControls.style.display = 'block';
+        btnRestart.style.display = 'block';
+
+    } catch (error) {
+        console.error("Error initializing session:", error);
+        messageArea.textContent = "Error connecting to server. Please refresh.";
+    }
+}
+
+/**
+ * 6. Game Functions - These talk to the server
  */
 
 async function newGame() {
     console.log("Starting new game...");
-
-    // --- NEW --- Get bet amount from input
     const betAmount = betAmountInput.value;
 
-    // Call the '/game/new' endpoint on our server
     const response = await fetch(`${API_URL}/game/new`, {
         method: 'POST',
-        // --- NEW --- Send the bet amount in the body
         headers: {
-            'Content-Type': 'application/json' // Tell the server we're sending JSON
+            'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ betAmount: betAmount }) // Convert our data to a JSON string
+        // Send BOTH the session ID and the bet
+        body: JSON.stringify({ 
+            sessionId: sessionId, 
+            betAmount: betAmount 
+        })
     });
 
     const gameState = await response.json();
 
-    // --- NEW --- Check for errors from the server (e.g. not enough money)
     if (gameState.error) {
         messageArea.textContent = gameState.error;
-        return; // Stop here if there was an error
+        return;
     }
 
-    // Update the screen with the new game state
-updateUI(gameState); // updateUI will handle buttons *if* game is over
+    updateUI(gameState);
 
-// --- NEW LOGIC ---
-// Only hide bet controls IF the game is *not* over
-if (!gameState.isGameOver) {
-    // Normal game start, show action buttons
-    betControls.style.display = 'none';
-    actionControls.style.display = 'block';
+    // Only show action buttons if the game isn't over (e.g., from Blackjack)
+    if (!gameState.isGameOver) {
+        betControls.style.display = 'none';
+        actionControls.style.display = 'block';
+    }
 }
-}
-// If the game *is* over (from Blackjack), updateUI already handled
-// showing the bet controls, so we do nothing here.
-
 
 async function hit() {
     console.log("Player HITS...");
 
-    // Call the '/game/hit' endpoint
     const response = await fetch(`${API_URL}/game/hit`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        // Send the session ID so the server knows *who* is hitting
+        body: JSON.stringify({ sessionId: sessionId })
     });
     const gameState = await response.json();
     
-    // Update the screen
     updateUI(gameState);
 }
 
 async function stand() {
     console.log("Player STANDS...");
 
-    // Call the '/game/stand' endpoint
     const response = await fetch(`${API_URL}/game/stand`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        // Send the session ID so the server knows *who* is standing
+        body: JSON.stringify({ sessionId: sessionId })
     });
     const gameState = await response.json();
 
-    // Update the screen with the final result
     updateUI(gameState);
 }
 
@@ -104,9 +136,13 @@ async function stand() {
 async function restartWallet() {
     console.log("Resetting wallet...");
     
-    // Call the '/game/restart' endpoint
     const response = await fetch(`${API_URL}/game/restart`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        // Send the session ID to reset the correct wallet
+        body: JSON.stringify({ sessionId: sessionId })
     });
     const gameState = await response.json();
 
@@ -120,34 +156,31 @@ async function restartWallet() {
     playerScoreEl.textContent = '?';
     playerCardsEl.innerHTML = '';
     dealerCardsEl.innerHTML = '';
-    messageArea.textContent = gameState.message; // Show reset message
+    messageArea.textContent = gameState.message;
 }
 
+
 /**
- * 5. Helper Functions - These update the webpage
+ * 7. Helper Functions - These update the webpage
  */
 
 function updateUI(gameState) {
-    // Update messages and scores
     messageArea.textContent = gameState.message;
-    playerScoreEl.textContent = gameState.playerScore;
-
-    // --- NEW --- Update wallet display
-    // Use ?? (Nullish Coalescing) in case wallet isn't sent every time
-    // (Though our server *does* send it, this is good practice)
+    
+    // Check for null score, default to '?'
+    playerScoreEl.textContent = gameState.playerScore !== null ? gameState.playerScore : '?';
+    
     if (gameState.playerWallet !== undefined) {
-        walletArea.textContent = `Wallet: $${gameState.playerWallet}`;
+        // Format wallet to 2 decimal places if it's a fraction (from 3:2 payout)
+        walletArea.textContent = `Wallet: $${parseFloat(gameState.playerWallet).toFixed(2)}`;
     }
 
-    // If the game is over...
     if (gameState.isGameOver) {
-        dealerScoreEl.textContent = gameState.dealerScore;
-
-        // --- NEW --- Show betting, hide Hit/Stand
+        dealerScoreEl.textContent = gameState.dealerScore !== null ? gameState.dealerScore : '?';
+        // Show betting, hide Hit/Stand
         betControls.style.display = 'block';
         actionControls.style.display = 'none';
-
-    } else { // If game is NOT over...
+    } else {
         dealerScoreEl.textContent = '?';
     }
 
@@ -155,8 +188,10 @@ function updateUI(gameState) {
     renderHand(gameState.playerHand, playerCardsEl);
     renderHand(gameState.dealerHand, dealerCardsEl, !gameState.isGameOver);
 }
+
 /**
- * Renders the cards for a specific hand
+ * --- THIS FUNCTION IS UPDATED ---
+ * Renders the cards for a specific hand using <img> tags
  * @param {Array} hand - Array of card objects
  * @param {HTMLElement} element - The HTML element to put the cards in
  * @param {boolean} hideFirstCard - If true, hides the dealer's first card
@@ -165,33 +200,41 @@ function renderHand(hand, element, hideFirstCard = false) {
     // Clear previous cards
     element.innerHTML = '';
     
-    // Handle edge case where hand might be empty
     if (!hand) return;
 
-    // Create a card element for each card
+    // Base URL for card images
+    const cardImageUrl = 'https://deckofcardsapi.com/static/img';
+
     hand.forEach((card, index) => {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = 'card'; // We will use this for styling later
+        // Create an <img> element
+        const cardImg = document.createElement('img');
+        cardImg.className = 'card'; // For styling
 
         if (hideFirstCard && index === 0) {
-            // Show a card back instead of the real card
-            cardDiv.textContent = '🂠'; // Unicode for card back
-            cardDiv.classList.add('card-back');
+            // Show a card back
+            cardImg.src = `${cardImageUrl}/back.png`;
         } else {
-            // Show the real card
-            // Use the toString() method from our game-engine!
-            const suitSymbols = {
-                'Spades': '♠️',
-                'Hearts': '♥️',
-                'Diamonds': '♦️',
-                'Clubs': '♣️'
-            };
-            cardDiv.textContent = `${card.rank} ${suitSymbols[card.suit]}`;
-            // Add a class for color (red/black)
-            if (card.suit === 'Hearts' || card.suit === 'Diamonds') {
-                cardDiv.classList.add('red');
-            }
+            // Show the real card using the 'code' (e.g., "AS", "KH", "0H")
+            cardImg.src = `${cardImageUrl}/${card.code}.png`;
         }
-        element.appendChild(cardDiv);
+        
+        // Add a little delay to each card for a "dealing" animation
+        // This makes the animation staggered
+        cardImg.style.animationDelay = `${index * 100}ms`;
+
+        element.appendChild(cardImg);
     });
 }
+
+
+/**
+ * 8. --- NEW --- Start everything!
+ * We hide all controls by default to prevent clicks before session is ready
+ */
+betControls.style.display = 'none';
+actionControls.style.display = 'none';
+btnRestart.style.display = 'none';
+messageArea.textContent = 'Connecting to server...';
+
+// Call the initialize function when the script loads
+initializeSession();
