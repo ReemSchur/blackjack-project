@@ -1,71 +1,84 @@
 🃏 Full-Stack Blackjack Game
 
-This is a complete, full-stack implementation of the game Blackjack (21), built from scratch with a modern client-server architecture.
-
 Click here for the Live Demo
 (Note: The free Render service may take ~30 seconds to "wake up" on the first load.)
 
 (To add a screenshot: Take a picture of the game, add it to this folder as screenshot.png, and it will appear here.)
 
-🚀 About This Project
+1. Overview
 
-This project was built to demonstrate a deep understanding of full-stack development principles, from creating a RESTful API in Node.js to managing client-side state with vanilla JavaScript. The application simulates a real Blackjack table, including a betting system, 3:2 Blackjack payouts, and separate sessions for each player.
+This project is a complete, full-stack implementation of the game Blackjack (21), built from scratch to demonstrate a deep understanding of modern web architecture. The application simulates a real Blackjack table, including a betting system, 3:2 Blackjack payouts, and separate sessions for each player.
 
 The core challenge was to manage the game state and wallet persistently on the server, completely decoupled from the client-side logic.
 
-✨ Key Features
+2. Features
 
-Full-Stack Architecture: Complete separation between the logical Back-End ("The Dealer") and the visual Front-End ("The Table").
+Full Game Logic: Implements all standard Blackjack rules (1:1 win, 3:2 Blackjack, Push, Bust, Auto-stand on 21).
 
-Persistent Database: Player wallet balances are saved in a SQLite database, allowing players to return later and continue with their saved bankroll.
+Persistent Wallet: Player bankroll is saved in a SQLite database, persisting between sessions.
 
-Multi-Session Management: The server manages a separate game and wallet for each connected client using a unique sessionId stored in localStorage.
+Multi-Session Management: The server manages a separate game and wallet for each connected client using a unique sessionId.
 
 RESTful API: A clear API for all game actions (/game/new, /game/hit, /game/stand) and session management.
 
-Complete Game Logic: Implements all standard Blackjack rules:
+Dynamic UI: A clean UI built with vanilla JavaScript, CSS animations, and dynamic card images.
 
-1:1 payout for a regular win.
+3. System Architecture & Components
 
-Special 3:2 payout for a natural "Blackjack".
+The project is built on a decoupled client-server architecture.
 
-Push (tie).
+Client (Front-End):
 
-Bust.
+A static "single-page application" (SPA) built with HTML, CSS, and vanilla JavaScript (ES6+).
 
-Automatic stand on 21.
+Responsible only for rendering the UI and capturing user input.
 
-Dynamic Front-End: A clean UI built with vanilla JavaScript, CSS animations, and dynamic card images.
+Uses the Fetch API to send asynchronous requests to the back-end.
 
-🛠️ Tech Stack
+Uses localStorage to store the unique sessionId and re-identify the client on page load.
 
-Back-End
+Server (Back-End):
 
-Node.js
+A Node.js / Express.js server that exposes a stateless RESTful API.
 
-Express.js (for the RESTful API)
+Game Engine (game-engine.js): A separate module containing all the pure game logic (Card, Deck, Game classes).
 
-better-sqlite3 (for SQLite database management)
+Session Management: Manages all active games and wallet balances in-memory (Map) for speed, backed by a persistent database.
 
-CORS (for cross-origin requests)
+API Endpoints: Handles all logic for game actions (/game/hit), session creation (/session/new), and payout calculations.
 
-Front-End
+Database (Persistence):
 
-JavaScript (ES6+)
+An SQLite database (via better-sqlite3) is used as a persistent storage layer.
 
-Fetch API (for async server communication)
+The database stores only the sessionId and the corresponding walletAmount, ensuring that a player's bankroll is saved even if the server restarts.
 
-localStorage (for session persistence)
+4. File Structure
 
-HTML5
+blackjack-project/
+├── .gitignore
+├── blackjack.db        # SQLite database file (persistent wallet storage)
+├── game-engine.js      # Core Blackjack logic (Card, Deck, Game classes)
+├── package-lock.json
+├── package.json        # Project dependencies and scripts
+├── server.js           # The Node.js/Express back-end server (API)
+└── public/
+    ├── app.js          # Client-side JavaScript (Fetch API, DOM manipulation)
+    ├── index.html      # The main HTML structure
+    └── style.css       # All CSS styling and animations
 
-CSS3 (including keyframes animations)
 
-Deployment
+5. Setup and Execution (How To Run Locally)
 
-Render (for the Web Service)
+Instructions for running the project on a local machine.
 
-🚀 How To Run Locally
+Prerequisites
+
+Node.js (which includes npm)
+
+Git
+
+Running the Application
 
 Clone the repository:
 
@@ -74,16 +87,28 @@ cd blackjack-project
 
 
 Install the dependencies:
+This will install express, cors, and better-sqlite3.
 
 npm install
 
 
 Start the server:
+This will launch the server and create the blackjack.db file.
 
 node server.js
 
 
-Open your browser and navigate to:
-http://localhost:3000
+Open the application:
+Open your browser and navigate to: http://localhost:3000
 
-Built as a guided project with Gemini.
+6. Tech Stack
+
+Back-End: Node.js, Express.js
+
+Database: SQLite (via better-sqlite3)
+
+Front-End: JavaScript (ES6+), HTML5, CSS3
+
+Environment: Git, Render (for Deployment)
+
+
