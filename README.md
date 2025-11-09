@@ -1,6 +1,6 @@
 # 🃏 Full-Stack Blackjack Game
 
-[🎮 Click here for the Live Demo](https://your-live-demo-link)  
+[🎮 Click here for the Live Demo](https://reems-blackjack.onrender.com/)  
 *(Note: The free Render service may take ~30 seconds to "wake up" on the first load.)*
 
 ---
