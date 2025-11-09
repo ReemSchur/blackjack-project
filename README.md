@@ -45,6 +45,7 @@ The core challenge was to manage the game state and wallet persistently on the s
 ---
 
 ## 🗂️ File Structure
+```
 blackjack-project/
 ├── .gitignore
 ├── blackjack.db
@@ -56,7 +57,7 @@ blackjack-project/
 ├── app.js
 ├── index.html
 └── style.css
-
+```
 ---
 
 ## 🧰 Setup and Execution (Run Locally)
@@ -79,8 +80,7 @@ node server.js
 
 Then open your browser at:
 http://localhost:3000
-
-
+```
 ---
 
 ## 🧱 Tech Stack
