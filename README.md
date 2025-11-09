@@ -5,10 +5,6 @@
 
 ---
 
-## 📸 Screenshot
-*(To add a screenshot: Take a picture of the game, add it to this folder as `screenshot.png`, and it will appear here.)*
-
----
 
 ## 🧩 Overview
 This project is a complete, full-stack implementation of the game **Blackjack (21)**, built from scratch to demonstrate a deep understanding of modern web architecture.  
@@ -85,7 +81,9 @@ Then open your browser at:
 http://localhost:3000
 
 
-🧱 Tech Stack
+---
+
+## 🧱 Tech Stack
 Back-End: Node.js, Express.js
 Database: SQLite (better-sqlite3)
 Front-End: JavaScript (ES6+), HTML5, CSS3
