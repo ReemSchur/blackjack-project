@@ -84,8 +84,8 @@ http://localhost:3000
 ---
 
 ## 🧱 Tech Stack
-Back-End: Node.js, Express.js
-Database: SQLite (better-sqlite3)
-Front-End: JavaScript (ES6+), HTML5, CSS3
-Environment: Git, Render (Deployment)
+- **Back-End:** Node.js, Express.js
+- **Database:** SQLite (better-sqlite3)
+- **Front-End:** JavaScript (ES6+), HTML5, CSS3
+- **Environment:** Git, Render (Deployment)
 
